@@ -1,0 +1,99 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String        @id
+  email        String       @unique
+  password     String
+  name         String
+  phone        String
+  status       String       @default("Activo")
+  cedula       String       @unique
+  address      String
+  registerDate DateTime     @default(now())
+  lastLogin    DateTime?
+  packages     Package[]
+  liquidations Liquidation[]
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+}
+
+model Package {
+  id          String      @id @default(cuid())
+  tracking    String      @unique
+  status      String
+  value       Float
+  description String?
+  weight      Float?
+  origin      String?
+  userId      String
+  user        User        @relation(fields: [userId], references: [id])
+  invoice     Invoice?
+  images      Image[]
+  liquidation Liquidation?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+}
+
+model Invoice {
+  id        String   @id @default(cuid())
+  name      String
+  url       String
+  type      String
+  packageId String   @unique
+  package   Package  @relation(fields: [packageId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Image {
+  id        String   @id @default(cuid())
+  name      String
+  url       String
+  packageId String
+  package   Package  @relation(fields: [packageId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Liquidation {
+  id            String   @id @default(cuid())
+  status        String
+  value         Float
+  paymentAmount Float
+  description   String?
+  observations  String?
+  userId        String
+  user          User     @relation(fields: [userId], references: [id])
+  packageId     String   @unique
+  package       Package  @relation(fields: [packageId], references: [id])
+  invoice       Invoice?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model SystemConfig {
+  id            Int      @id @default(1)
+  companyName   String
+  supportEmail  String
+  supportPhone  String
+  address       String
+  website       String
+  smtpHost      String
+  smtpPort      String
+  smtpSecure    Boolean
+  smtpUser      String
+  smtpPassword  String
+  smtpFrom      String
+  theme         Json
+  messages      Json
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
