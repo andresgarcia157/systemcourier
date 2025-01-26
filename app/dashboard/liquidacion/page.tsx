@@ -1,271 +1,239 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useEffect } from "react"
+import { processPayment } from "@/app/actions/payments"
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Badge } from "@/components/ui/badge"
-import { Checkbox } from "@/components/ui/checkbox"
-import { CreditCard, Loader2, Camera, ImageIcon } from "lucide-react"
-import { processPayment } from "@/app/actions/payment"
-import { toast } from "sonner"
-import { formatCardNumber, formatExpiry } from "@/lib/utils/validate-card"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import Image from "next/image"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import { format } from "date-fns"
+import { es } from "date-fns/locale"
 
-interface PackageImage {
+interface Package {
   id: string
-  url: string
-  name: string
+  tracking: string
+  description?: string
+  value: number
 }
 
-// Datos de ejemplo
-const mockLiquidaciones = [
-  {
-    id: "LIQ001",
-    fecha: "2025-01-20",
-    tracking: "TR123456789",
-    contenido: "Electrónicos",
-    total: "$250.00",
-    estado: "Pendiente",
-    packageImages: [
-      {
-        id: "1",
-        url: "/placeholder.svg?height=300&width=400",
-        name: "package-front.jpg",
-      },
-      {
-        id: "2",
-        url: "/placeholder.svg?height=300&width=400",
-        name: "package-back.jpg",
-      },
-    ],
-  },
-  {
-    id: "LIQ002",
-    fecha: "2025-01-19",
-    tracking: "TR987654321",
-    contenido: "Ropa",
-    total: "$125.75",
-    estado: "Pagado",
-    packageImages: [
-      {
-        id: "3",
-        url: "/placeholder.svg?height=300&width=400",
-        name: "evidence-1.jpg",
-      },
-    ],
-  },
-]
+interface Invoice {
+  id: string
+  name: string
+  url: string
+}
+
+interface Liquidation {
+  id: string
+  amount: number
+  status: "PENDING" | "PAID" | "CANCELLED"
+  packageId: string
+  package: Package
+  invoice?: Invoice
+  createdAt: string
+  updatedAt: string
+}
 
 export default function LiquidacionPage() {
-  const [selectedLiquidations, setSelectedLiquidations] = useState<Set<string>>(new Set())
-  const [showCheckout, setShowCheckout] = useState(false)
-  const [isProcessing, setIsProcessing] = useState(false)
-  const [showImageDialog, setShowImageDialog] = useState(false)
-  const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null)
-  const [formData, setFormData] = useState({
-    cardNumber: "",
-    expiry: "",
-    cvc: "",
-    name: "",
-  })
+  const [loading, setLoading] = useState(false)
+  const [liquidations, setLiquidations] = useState<Liquidation[]>([])
+  const [selectedLiquidation, setSelectedLiquidation] = useState<Liquidation | null>(null)
+  const [dialogOpen, setDialogOpen] = useState(false)
 
-  // Calculate total of selected liquidations
-  const selectedTotal = useMemo(() => {
-    return Array.from(selectedLiquidations).reduce((total, id) => {
-      const liquidacion = mockLiquidaciones.find((l) => l.id === id)
-      if (liquidacion) {
-        const amount = Number.parseFloat(liquidacion.total.replace("$", ""))
-        return total + amount
-      }
-      return total
-    }, 0)
-  }, [selectedLiquidations])
+  useEffect(() => {
+    fetchLiquidations()
+  }, [])
 
-  const handleLiquidationSelect = (id: string, checked: boolean) => {
-    const newSelected = new Set(selectedLiquidations)
-    if (checked) {
-      newSelected.add(id)
-    } else {
-      newSelected.delete(id)
-    }
-    setSelectedLiquidations(newSelected)
-  }
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target
-    let formattedValue = value
-
-    if (name === "cardNumber") {
-      formattedValue = formatCardNumber(value)
-    } else if (name === "expiry") {
-      formattedValue = formatExpiry(value)
-    } else if (name === "cvc") {
-      formattedValue = value.replace(/\D/g, "").slice(0, 4)
-    }
-
-    setFormData((prev) => ({ ...prev, [name]: formattedValue }))
-  }
-
-  const handleSubmitPayment = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsProcessing(true)
-
+  const fetchLiquidations = async () => {
     try {
-      const selectedItems = Array.from(selectedLiquidations).map((id) => {
-        const liquidacion = mockLiquidaciones.find((l) => l.id === id)
-        return {
-          id,
-          description: `Liquidación #${id} - ${liquidacion?.contenido}`,
-          amount: Number.parseFloat(liquidacion?.total.replace("$", "") || "0"),
-        }
-      })
+      const response = await fetch('/api/liquidations')
+      const data = await response.json()
+      if (data.success) {
+        setLiquidations(data.liquidations)
+      } else {
+        toast.error("Error al cargar las liquidaciones")
+      }
+    } catch (error) {
+      console.error("Error fetching liquidations:", error)
+      toast.error("Error al cargar las liquidaciones")
+    }
+  }
 
-      const formDataToSend = new FormData()
-      formDataToSend.append("cardNumber", formData.cardNumber)
-      formDataToSend.append("expiry", formData.expiry)
-      formDataToSend.append("cvc", formData.cvc)
-      formDataToSend.append("name", formData.name)
-      formDataToSend.append("amount", selectedTotal.toString())
-      formDataToSend.append("orderId", `ORD-${Date.now()}`)
-      formDataToSend.append("items", JSON.stringify(selectedItems))
-
-      const response = await processPayment(formDataToSend)
+  const handlePayment = async (formData: FormData) => {
+    try {
+      setLoading(true)
+      const response = await processPayment(formData)
 
       if (response.success) {
         toast.success("Pago procesado exitosamente")
-        setShowCheckout(false)
-        setSelectedLiquidations(new Set())
+        setDialogOpen(false)
+        fetchLiquidations() // Recargar la lista
       } else {
-        toast.error(response.error || "Error al procesar el pago")
+        toast.error(response.message || "Error al procesar el pago")
       }
     } catch (error) {
+      console.error("Error en el pago:", error)
       toast.error("Error al procesar el pago")
     } finally {
-      setIsProcessing(false)
+      setLoading(false)
+    }
+  }
+
+  const formatDate = (date: string) => {
+    return format(new Date(date), "dd 'de' MMMM 'de' yyyy", { locale: es })
+  }
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('es-DO', {
+      style: 'currency',
+      currency: 'DOP'
+    }).format(amount)
+  }
+
+  const getStatusBadgeClass = (status: string) => {
+    switch (status) {
+      case 'PAID':
+        return 'bg-green-100 text-green-800'
+      case 'PENDING':
+        return 'bg-yellow-100 text-yellow-800'
+      case 'CANCELLED':
+        return 'bg-red-100 text-red-800'
+      default:
+        return 'bg-gray-100 text-gray-800'
+    }
+  }
+
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case 'PAID':
+        return 'Pagado'
+      case 'PENDING':
+        return 'Pendiente'
+      case 'CANCELLED':
+        return 'Cancelado'
+      default:
+        return status
     }
   }
 
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Buscar Liquidación</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="tracking">Número de Tracking</Label>
-                <Input id="tracking" placeholder="Ingrese el número de tracking" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="descripcion">Descripción</Label>
-                <Input id="descripcion" placeholder="Descripción del paquete" />
-              </div>
-            </div>
-            <Button type="submit">Buscar</Button>
-          </form>
-        </CardContent>
-      </Card>
+    <div className="container mx-auto p-6">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold">Liquidaciones</h1>
+      </div>
 
-      <Card>
+      <Card className="mb-6">
         <CardHeader>
-          <CardTitle>Liquidaciones</CardTitle>
+          <CardTitle>Lista de Liquidaciones</CardTitle>
+          <CardDescription>
+            Gestione sus liquidaciones y procese los pagos
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[50px]">Seleccionar</TableHead>
-                <TableHead>Fecha</TableHead>
                 <TableHead>Tracking</TableHead>
-                <TableHead>Contenido</TableHead>
-                <TableHead>Total</TableHead>
+                <TableHead>Descripción</TableHead>
+                <TableHead>Fecha</TableHead>
+                <TableHead>Monto</TableHead>
                 <TableHead>Estado</TableHead>
-                <TableHead>Evidencias</TableHead>
+                <TableHead>Factura</TableHead>
+                <TableHead>Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {mockLiquidaciones.map((liquidacion) => (
-                <TableRow key={liquidacion.id}>
-                  <TableCell>
-                    <Checkbox
-                      checked={selectedLiquidations.has(liquidacion.id)}
-                      onCheckedChange={(checked) => handleLiquidationSelect(liquidacion.id, checked as boolean)}
-                      disabled={liquidacion.estado !== "Pendiente"}
-                    />
-                  </TableCell>
-                  <TableCell>{liquidacion.fecha}</TableCell>
-                  <TableCell>{liquidacion.tracking}</TableCell>
-                  <TableCell>{liquidacion.contenido}</TableCell>
-                  <TableCell className="font-medium">{liquidacion.total}</TableCell>
-                  <TableCell>
-                    <Badge variant={liquidacion.estado === "Pendiente" ? "warning" : "success"}>
-                      {liquidacion.estado}
-                    </Badge>
+              {liquidations.map((liquidation) => (
+                <TableRow key={liquidation.id}>
+                  <TableCell className="font-medium">
+                    {liquidation.package.tracking}
                   </TableCell>
                   <TableCell>
-                    {liquidacion.packageImages && liquidacion.packageImages.length > 0 ? (
-                      <Dialog>
+                    {liquidation.package.description || 'Sin descripción'}
+                  </TableCell>
+                  <TableCell>{formatDate(liquidation.createdAt)}</TableCell>
+                  <TableCell>{formatCurrency(liquidation.amount)}</TableCell>
+                  <TableCell>
+                    <span className={`px-2 py-1 rounded-full text-xs font-semibold ${getStatusBadgeClass(liquidation.status)}`}>
+                      {getStatusText(liquidation.status)}
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    {liquidation.invoice && (
+                      <a 
+                        href={liquidation.invoice.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:text-blue-800 underline"
+                      >
+                        Ver Factura
+                      </a>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {liquidation.status === 'PENDING' && (
+                      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
                         <DialogTrigger asChild>
-                          <Button variant="ghost" size="icon">
-                            <Camera className="h-4 w-4" />
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setSelectedLiquidation(liquidation)}
+                          >
+                            Procesar Pago
                           </Button>
                         </DialogTrigger>
-                        <DialogContent className="max-w-4xl">
+                        <DialogContent>
                           <DialogHeader>
-                            <DialogTitle>Evidencias del Paquete</DialogTitle>
+                            <DialogTitle>Procesar Pago</DialogTitle>
+                            <DialogDescription>
+                              Complete los detalles del pago para la liquidación del paquete {selectedLiquidation?.package.tracking}
+                            </DialogDescription>
                           </DialogHeader>
-                          <div className="space-y-4">
-                            <div className="grid grid-cols-2 gap-4">
-                              <div>
-                                <Label>Tracking</Label>
-                                <div className="font-medium">{liquidacion.tracking}</div>
-                              </div>
-                              <div>
-                                <Label>Contenido</Label>
-                                <div className="font-medium">{liquidacion.contenido}</div>
-                              </div>
-                            </div>
-
+                          <form action={handlePayment} className="space-y-4">
+                            <input
+                              type="hidden"
+                              name="liquidationId"
+                              value={selectedLiquidation?.id}
+                            />
                             <div className="space-y-2">
-                              <Label>Imágenes ({liquidacion.packageImages.length})</Label>
-                              <ScrollArea className="h-[300px] rounded-md border p-4">
-                                <div className="grid grid-cols-2 gap-4">
-                                  {liquidacion.packageImages.map((image) => (
-                                    <div
-                                      key={image.id}
-                                      className="group relative aspect-video cursor-pointer overflow-hidden rounded-lg border bg-muted"
-                                      onClick={() => {
-                                        setSelectedImageUrl(image.url)
-                                        setShowImageDialog(true)
-                                      }}
-                                    >
-                                      <Image
-                                        src={image.url || "/placeholder.svg"}
-                                        alt={image.name}
-                                        fill
-                                        className="object-cover transition-transform group-hover:scale-105"
-                                      />
-                                      <div className="absolute inset-0 bg-black/40 opacity-0 transition-opacity group-hover:opacity-100" />
-                                      <div className="absolute inset-0 flex items-center justify-center opacity-0 transition-opacity group-hover:opacity-100">
-                                        <ImageIcon className="h-8 w-8 text-white" />
-                                      </div>
-                                    </div>
-                                  ))}
-                                </div>
-                              </ScrollArea>
+                              <Label htmlFor="amount">Monto a Pagar</Label>
+                              <Input
+                                id="amount"
+                                name="amount"
+                                type="number"
+                                placeholder="0.00"
+                                step="0.01"
+                                min="0"
+                                defaultValue={selectedLiquidation?.amount}
+                                required
+                              />
                             </div>
-                          </div>
+                            <Button 
+                              type="submit" 
+                              disabled={loading}
+                              className="w-full"
+                            >
+                              {loading ? "Procesando..." : "Confirmar Pago"}
+                            </Button>
+                          </form>
                         </DialogContent>
                       </Dialog>
-                    ) : (
-                      <span className="text-muted-foreground text-sm">No disponible</span>
                     )}
                   </TableCell>
                 </TableRow>
@@ -275,130 +243,11 @@ export default function LiquidacionPage() {
         </CardContent>
       </Card>
 
-      {selectedLiquidations.size > 0 && (
-        <div className="fixed bottom-6 right-6 flex gap-4 items-center bg-background border rounded-lg p-4 shadow-lg">
-          <div className="text-sm">
-            <div className="font-medium">Liquidaciones seleccionadas: {selectedLiquidations.size}</div>
-            <div className="text-2xl font-bold text-primary">Total: ${selectedTotal.toFixed(2)}</div>
-          </div>
-          <Dialog open={showCheckout} onOpenChange={setShowCheckout}>
-            <DialogTrigger asChild>
-              <Button className="gap-2">
-                <CreditCard className="h-4 w-4" />
-                Proceder al pago
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Checkout de Pago</DialogTitle>
-              </DialogHeader>
-              <form onSubmit={handleSubmitPayment} className="space-y-4">
-                <div className="rounded-lg bg-muted p-4">
-                  <div className="text-sm font-medium">Resumen de Pago</div>
-                  <div className="mt-2 space-y-2">
-                    {Array.from(selectedLiquidations).map((id) => {
-                      const liq = mockLiquidaciones.find((l) => l.id === id)
-                      return liq ? (
-                        <div key={id} className="flex justify-between text-sm">
-                          <span>Liquidación #{liq.id}</span>
-                          <span>{liq.total}</span>
-                        </div>
-                      ) : null
-                    })}
-                    <div className="border-t pt-2 mt-2 font-bold flex justify-between">
-                      <span>Total a Pagar</span>
-                      <span className="text-primary">${selectedTotal.toFixed(2)}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="cardNumber">Número de Tarjeta</Label>
-                    <Input
-                      id="cardNumber"
-                      name="cardNumber"
-                      placeholder="4242 4242 4242 4242"
-                      value={formData.cardNumber}
-                      onChange={handleInputChange}
-                      maxLength={19}
-                      required
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="expiry">Fecha de Expiración</Label>
-                      <Input
-                        id="expiry"
-                        name="expiry"
-                        placeholder="MM/YY"
-                        value={formData.expiry}
-                        onChange={handleInputChange}
-                        maxLength={5}
-                        required
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="cvc">Código de Seguridad</Label>
-                      <Input
-                        id="cvc"
-                        name="cvc"
-                        placeholder="CVC"
-                        value={formData.cvc}
-                        onChange={handleInputChange}
-                        maxLength={4}
-                        required
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="name">Nombre en la Tarjeta</Label>
-                    <Input
-                      id="name"
-                      name="name"
-                      placeholder="Nombre completo"
-                      value={formData.name}
-                      onChange={handleInputChange}
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div className="flex justify-end gap-2">
-                  <Button type="button" variant="outline" onClick={() => setShowCheckout(false)}>
-                    Cancelar
-                  </Button>
-                  <Button type="submit" disabled={isProcessing}>
-                    {isProcessing ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Procesando...
-                      </>
-                    ) : (
-                      `Pagar $${selectedTotal.toFixed(2)}`
-                    )}
-                  </Button>
-                </div>
-              </form>
-            </DialogContent>
-          </Dialog>
+      {liquidations.length === 0 && (
+        <div className="text-center py-6">
+          <p className="text-muted-foreground">No hay liquidaciones disponibles</p>
         </div>
       )}
-
-      {/* Image Preview Dialog */}
-      <Dialog open={showImageDialog} onOpenChange={setShowImageDialog}>
-        <DialogContent className="max-w-4xl">
-          <DialogHeader>
-            <DialogTitle>Vista Previa</DialogTitle>
-          </DialogHeader>
-          {selectedImageUrl && (
-            <div className="relative aspect-video">
-              <Image src={selectedImageUrl || "/placeholder.svg"} alt="Preview" fill className="object-contain" />
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }
-

@@ -1,64 +1,135 @@
 "use client"
 
+import { useState } from "react"
+import { register } from "@/app/actions/auth"
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { useState } from "react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useRouter } from "next/navigation"
 
 export default function RegisterPage() {
-  const router = useRouter()
   const [loading, setLoading] = useState(false)
+  const router = useRouter()
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-    // Simular registro
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-    router.push("/dashboard")
+  const handleSubmit = async (formData: FormData) => {
+    try {
+      setLoading(true)
+      const result = await register(formData)
+      
+      if (result.error) {
+        toast.error(result.error)
+      } else if (result.success) {
+        toast.success("Registro exitoso")
+        await new Promise(resolve => setTimeout(resolve, 500))
+        router.push('/login')
+      }
+    } catch (error) {
+      console.error("Error de registro:", error)
+      toast.error("Error al registrar usuario")
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800">
-      <Card className="w-full max-w-lg mx-4">
-        <CardHeader className="space-y-1 text-center">
-          <CardTitle className="text-2xl font-bold">Registro de Importador</CardTitle>
-          <CardDescription>Complete el formulario para crear su cuenta</CardDescription>
+    <div className="min-h-screen flex items-center justify-center bg-[#1a2234]">
+      <Card className="w-full max-w-md mx-4">
+        <CardHeader className="space-y-1">
+          <CardTitle className="text-2xl font-bold text-center">Registro de Importador</CardTitle>
+          <CardDescription className="text-center">
+            Complete el formulario para crear su cuenta
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <form action={handleSubmit} className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="nombres">Nombres</Label>
-                <Input id="nombres" placeholder="Juan" required />
+                <Label htmlFor="name">Nombres</Label>
+                <Input
+                  id="name"
+                  name="name"
+                  placeholder="Juan"
+                  required
+                  className="w-full"
+                />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="apellidos">Apellidos</Label>
-                <Input id="apellidos" placeholder="Pérez" required />
+                <Label htmlFor="lastName">Apellidos</Label>
+                <Input
+                  id="lastName"
+                  name="lastName"
+                  placeholder="Pérez"
+                  required
+                  className="w-full"
+                />
               </div>
             </div>
+            
             <div className="space-y-2">
               <Label htmlFor="email">Correo Electrónico</Label>
-              <Input id="email" placeholder="correo@ejemplo.com" type="email" required />
+              <Input
+                id="email"
+                name="email"
+                type="email"
+                placeholder="correo@ejemplo.com"
+                required
+                className="w-full"
+              />
             </div>
+
             <div className="space-y-2">
-              <Label htmlFor="cedula">Cédula/RUC/Pasaporte</Label>
-              <Input id="cedula" placeholder="0900000000" required />
+              <Label htmlFor="document">Cédula/RUC/Pasaporte</Label>
+              <Input
+                id="document"
+                name="document"
+                placeholder="0900000000"
+                required
+                className="w-full"
+              />
             </div>
+
             <div className="space-y-2">
-              <Label htmlFor="telefono">Teléfono</Label>
-              <Input id="telefono" placeholder="0900000000" type="tel" required />
+              <Label htmlFor="phone">Teléfono</Label>
+              <Input
+                id="phone"
+                name="phone"
+                type="tel"
+                placeholder="0900000000"
+                required
+                className="w-full"
+              />
             </div>
+
             <div className="space-y-2">
-              <Label htmlFor="direccion">Dirección</Label>
-              <Input id="direccion" placeholder="Av. Principal #123" required />
+              <Label htmlFor="address">Dirección</Label>
+              <Input
+                id="address"
+                name="address"
+                placeholder="Av. Principal #123"
+                required
+                className="w-full"
+              />
             </div>
+
             <div className="space-y-2">
               <Label htmlFor="password">Contraseña</Label>
-              <Input id="password" type="password" required />
+              <Input
+                id="password"
+                name="password"
+                type="password"
+                required
+                className="w-full"
+              />
             </div>
-            <Button className="w-full" type="submit" disabled={loading}>
+
+            <Button 
+              type="submit" 
+              className="w-full bg-black hover:bg-gray-800"
+              disabled={loading}
+              size="lg"
+            >
               {loading ? "Registrando..." : "Registrarse"}
             </Button>
           </form>
@@ -67,4 +138,3 @@ export default function RegisterPage() {
     </div>
   )
 }
-

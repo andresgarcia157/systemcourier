@@ -1,9 +1,10 @@
 import type { Metadata } from 'next'
+import { Toaster } from "sonner"
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'v0 App',
-  description: 'Created with v0',
+  title: 'System Courier - Sistema de Gestión',
+  description: 'Sistema de gestión de paquetes y liquidaciones',
 }
 
 export default function RootLayout({
@@ -12,8 +13,11 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en">
-      <body>{children}</body>
+    <html lang="es">
+      <body>
+        {children}
+        <Toaster position="top-right" />
+      </body>
     </html>
   )
 }

@@ -1,3 +1,6 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -8,92 +11,92 @@ datasource db {
 }
 
 model User {
-  id           String        @id
-  email        String       @unique
-  password     String
-  name         String
-  phone        String
-  status       String       @default("Activo")
-  cedula       String       @unique
-  address      String
-  registerDate DateTime     @default(now())
-  lastLogin    DateTime?
-  packages     Package[]
-  liquidations Liquidation[]
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
+  id            String        @id @default(uuid())
+  email         String        @unique
+  password      String
+  name          String
+  lastName      String
+  phone         String?
+  address       String?
+  role          Role         @default(CLIENT)
+  packages      Package[]
+  liquidations  Liquidation[]
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
 }
 
 model Package {
-  id          String      @id @default(cuid())
-  tracking    String      @unique
-  status      String
-  value       Float
-  description String?
-  weight      Float?
-  origin      String?
-  userId      String
-  user        User        @relation(fields: [userId], references: [id])
-  invoice     Invoice?
-  images      Image[]
-  liquidation Liquidation?
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  id            String        @id @default(uuid())
+  tracking      String        @unique
+  description   String?
+  weight        Float?
+  value         Float
+  status        Status       @default(REGISTERED)
+  userId        String
+  user          User         @relation(fields: [userId], references: [id])
+  liquidation   Liquidation?
+  images        Image[]
+  invoice       Invoice?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+}
+
+model Liquidation {
+  id            String    @id @default(uuid())
+  packageId     String    @unique
+  package       Package   @relation(fields: [packageId], references: [id])
+  userId        String
+  user          User      @relation(fields: [userId], references: [id])
+  amount        Float
+  status        PaymentStatus @default(PENDING)
+  invoice       Invoice?  @relation(fields: [invoiceId], references: [id])
+  invoiceId     String?   @unique
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 }
 
 model Invoice {
-  id        String   @id @default(cuid())
-  name      String
-  url       String
-  type      String
-  packageId String   @unique
-  package   Package  @relation(fields: [packageId], references: [id])
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id            String       @id @default(uuid())
+  name          String
+  url           String
+  package       Package?     @relation(fields: [packageId], references: [id])
+  packageId     String?      @unique
+  liquidation   Liquidation?
+  createdAt     DateTime    @default(now())
 }
 
 model Image {
-  id        String   @id @default(cuid())
+  id        String   @id @default(uuid())
   name      String
   url       String
   packageId String
   package   Package  @relation(fields: [packageId], references: [id])
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model Liquidation {
-  id            String   @id @default(cuid())
-  status        String
-  value         Float
-  paymentAmount Float
-  description   String?
-  observations  String?
-  userId        String
-  user          User     @relation(fields: [userId], references: [id])
-  packageId     String   @unique
-  package       Package  @relation(fields: [packageId], references: [id])
-  invoice       Invoice?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
 }
 
 model SystemConfig {
-  id            Int      @id @default(1)
-  companyName   String
-  supportEmail  String
-  supportPhone  String
-  address       String
-  website       String
-  smtpHost      String
-  smtpPort      String
-  smtpSecure    Boolean
-  smtpUser      String
-  smtpPassword  String
-  smtpFrom      String
-  theme         Json
-  messages      Json
+  id            String   @id @default(uuid())
+  key           String   @unique
+  value         String   @db.Text
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 }
 
+enum Role {
+  ADMIN
+  CLIENT
+}
+
+enum Status {
+  REGISTERED
+  IN_TRANSIT
+  IN_WAREHOUSE
+  DELIVERED
+  RETAINED
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  CANCELLED
+}
